@@ -94,7 +94,10 @@ def replace_leaf(t, old, new):
     >>> laerad == yggdrasil # Make sure original tree is unmodified
     True
     """
-    "*** YOUR CODE HERE ***"
+    if is_leaf(t):
+        return tree(new) if label(t) == old else tree(label(t))
+    else:
+        return tree(label(t), [replace_leaf(b,old,new) for b in branches(t)]) 
 
 def print_move(origin, destination):
     """Print instructions to move a disk."""
@@ -127,8 +130,15 @@ def move_stack(n, start, end):
     Move the top disk from rod 2 to rod 3
     Move the top disk from rod 1 to rod 3
     """
+    #totally hard problem without any directions. Took some help from online gods
     assert 1 <= start <= 3 and 1 <= end <= 3 and start != end, "Bad start/end"
-    "*** YOUR CODE HERE ***"
+    if n == 1:
+        print_move(start,end)
+        #print(start,end)
+    else:
+        move_stack(n-1,start,6-start-end)
+        print_move(start,end)
+        move_stack(n-1,6-start-end,end)
 
 ###########
 # Mobiles #
@@ -166,15 +176,15 @@ def end(s):
 def weight(size):
     """Construct a weight of some size."""
     assert size > 0
-    "*** YOUR CODE HERE ***"
+    return tree(size)
 
 def size(w):
     """Select the size of a weight."""
-    "*** YOUR CODE HERE ***"
+    return label(w)
 
 def is_weight(w):
     """Whether w is a weight, not a mobile."""
-    "*** YOUR CODE HERE ***"
+    return is_leaf(w)
 
 def examples():
     t = mobile(side(1, weight(2)),
@@ -219,7 +229,18 @@ def balanced(m):
     >>> balanced(mobile(side(1, w), side(1, v)))
     False
     """
-    "*** YOUR CODE HERE ***"
+    assert is_mobile(m), 'Balanced needs a mobile to balance and not weight'
+    hang = [is_weight(end(s)) for s in sides(m)]
+    len_side0 = length(sides(m)[0])
+    len_side1 = length(sides(m)[1])
+    if hang == [True,True]:
+        return len_side0*total_weight(end(sides(m)[0])) == len_side1*total_weight(end(sides(m)[1]))
+    elif hang  == [True,False]:
+        return len_side0*size(end(sides(m)[0])) == len_side1*total_weight(end(sides(m)[1])) and balanced(end(sides(m)[1]))
+    elif hang  == [False,True]:
+        return len_side1*size(end(sides(m)[1])) == len_side0*total_weight(end(sides(m)[0])) and balanced(end(sides(m)[0]))
+    else:
+        return len_side0*total_weight(end(sides(m)[0])) == len_side1*total_weight(end(sides(m)[1])) and balanced(end(sides(m)[0])) and balanced(end(sides(m)[1]))
 
 #######
 # OOP #
@@ -235,7 +256,6 @@ class Account:
     10
     >>> a.interest
     0.02
-
     >>> a.time_to_retire(10.25) # 10 -> 10.2 -> 10.404
     2
     >>> a.balance               # balance should not change
@@ -267,7 +287,12 @@ class Account:
     def time_to_retire(self, amount):
         """Return the number of years until balance would grow to amount."""
         assert self.balance > 0 and amount > 0 and self.interest > 0
-        "*** YOUR CODE HERE ***"
+        count = 0
+        sum_amount = self.balance
+        while sum_amount < amount:
+            count +=1
+            sum_amount += sum_amount*self.interest
+        return count
 
 class FreeChecking(Account):
     """A bank account that charges for withdrawals, but the first two are free!
@@ -296,7 +321,12 @@ class FreeChecking(Account):
     withdraw_fee = 1
     free_withdrawals = 2
 
-    "*** YOUR CODE HERE ***"
+    def withdraw(self, amount):
+        if self.free_withdrawals > 0:
+            self.free_withdrawals -= 1
+            return Account.withdraw(self, amount)
+        else:
+            return Account.withdraw(self, amount + self.withdraw_fee)
 
 ############
 # Mutation #
@@ -322,7 +352,14 @@ def make_counter():
     >>> c('b') + c2('b')
     5
     """
-    "*** YOUR CODE HERE ***"
+    count = {}
+    def value(val):
+        if val in count:
+            count[val] += 1
+        else:
+            count[val] = 1
+        return count[val]
+    return value
 
 def make_fib():
     """Returns a function that returns the next Fibonacci number
@@ -343,7 +380,13 @@ def make_fib():
     >>> fib() + sum([fib2() for _ in range(5)])
     12
     """
-    "*** YOUR CODE HERE ***"
+    first, second = 0, 1
+    def summed():
+        nonlocal first, second
+        num = first
+        first, second = second, first + second
+        return num
+    return summed
 
 def make_withdraw(balance, password):
     """Return a password-protected withdraw function.
@@ -358,7 +401,7 @@ def make_withdraw(balance, password):
     >>> error
     'Incorrect password'
     >>> new_bal = w(25, 'hax0r')
-    >>> new
+    >>> new_bal
     50
     >>> w(75, 'a')
     'Incorrect password'
@@ -373,7 +416,23 @@ def make_withdraw(balance, password):
     >>> type(w(10, 'l33t')) == str
     True
     """
-    "*** YOUR CODE HERE ***"
+    stored_pass = []
+    def withdraw(amount):
+        nonlocal balance
+        if amount > balance:
+            return 'Insufficient funds'
+        balance = balance - amount
+        return balance
+    def wd(amount, code):
+        #print(stored_pass)
+        if len(stored_pass) >= 3:
+            return 'Your account is locked. Attempts: ' + str(stored_pass)
+        elif code != password:
+            stored_pass.append(code)
+            return 'Incorrect password'
+        else:
+            return withdraw(amount)
+    return wd
 
 def make_joint(withdraw, old_password, new_password):
     """Return a password-protected withdraw function that has joint access to
@@ -413,7 +472,19 @@ def make_joint(withdraw, old_password, new_password):
     >>> make_joint(w, 'hax0r', 'hello')
     "Your account is locked. Attempts: ['my', 'secret', 'password']"
     """
-    "*** YOUR CODE HERE ***"
+    
+    def wd(amount, password):
+        if password == new_password or password == old_password:
+            return withdraw(amount,old_password)
+        else:
+            return withdraw(amount, password)
+
+    returned = withdraw(0,old_password)
+    
+    if type(returned) == str:
+        return returned
+    else:
+        return wd
 
 ###################
 # Extra Questions #
@@ -425,11 +496,11 @@ def interval(a, b):
 
 def lower_bound(x):
     """Return the lower bound of interval x."""
-    "*** YOUR CODE HERE ***"
+    return x[0]
 
 def upper_bound(x):
     """Return the upper bound of interval x."""
-    "*** YOUR CODE HERE ***"
+    return x[1]
 
 def str_interval(x):
     """Return a string representation of interval x."""
@@ -445,22 +516,22 @@ def add_interval(x, y):
 def mul_interval(x, y):
     """Return the interval that contains the product of any value in x and any
     value in y."""
-    p1 = x[0] * y[0]
-    p2 = x[0] * y[1]
-    p3 = x[1] * y[0]
-    p4 = x[1] * y[1]
-    return [min(p1, p2, p3, p4), max(p1, p2, p3, p4)]
+    p1 = lower_bound(x) * lower_bound(y)
+    p2 = lower_bound(x) * upper_bound(y)
+    p3 = upper_bound(x) * lower_bound(y)
+    p4 = upper_bound(x) * upper_bound(y)
+    return interval(min(p1, p2, p3, p4), max(p1, p2, p3, p4))
 
 def sub_interval(x, y):
     """Return the interval that contains the difference between any value in x
     and any value in y."""
-    "*** YOUR CODE HERE ***"
+    return interval(lower_bound(x) - upper_bound(y), upper_bound(x) - lower_bound(y))
 
 def div_interval(x, y):
     """Return the interval that contains the quotient of any value in x divided by
     any value in y. Division is implemented as the multiplication of x by the
     reciprocal of y."""
-    "*** YOUR CODE HERE ***"
+    assert not (lower_bound(y) <= 0 and upper_bound(y) >= 0), 'Divisors span zero'
     reciprocal_y = interval(1/upper_bound(y), 1/lower_bound(y))
     return mul_interval(x, reciprocal_y)
 
@@ -482,8 +553,8 @@ def check_par():
     >>> lower_bound(x) != lower_bound(y) or upper_bound(x) != upper_bound(y)
     True
     """
-    r1 = interval(1, 1) # Replace this line!
-    r2 = interval(1, 1) # Replace this line!
+    r1 = interval(3, 7) # Replace this line!
+    r2 = interval(1, 2) # Replace this line!
     return r1, r2
 
 def multiple_references_explanation():
